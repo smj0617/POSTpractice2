@@ -19,7 +19,9 @@
 | 2-1 | 글 작성 API (`ApiV1PostController`, `PostDto`) | ✅ 완료 |
 | 2-2 | 글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
-| 3-1 ~ 3-3 | 글 삭제 API → 성공 테스트 → 없는 글 삭제·실패 테스트 | ⏳ 예정 |
+| 3-1 | 글 삭제 API | ✅ 완료 |
+| 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ⏳ 예정 |
+| 3-3 | 없는 글 삭제 + 실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
 
@@ -446,3 +448,45 @@ ApiV1PostControllerTest > 글 작성 실패 - 내용이 공백뿐이면 400 이�
 | 기존 테스트 13건 | | ✅ 통과 |
 
 ![2-3 After - 테스트 결과](docs/images/step2-3-after.png)
+
+---
+
+## 3-1: 글 삭제 API
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `PostService.java` | `delete(post)` 추가 |
+| 수정 | `ApiV1PostController.java` | `DELETE /api/v1/posts/{id}` → `delete(id)` 추가 |
+
+### 요청과 응답
+
+```http
+DELETE /api/v1/posts/3
+```
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{"id":3,"createDate":"...","modifyDate":"...","title":"제목 3","content":"내용 3"}
+```
+
+### 핵심 포인트
+- **`@DeleteMapping("/{id}")`**: 클래스의 `/api/v1/posts` + `/{id}` → `DELETE /api/v1/posts/3` 같은 요청을 받는다.
+- **`@PathVariable`**: 주소의 `{id}` 자리에 있는 값(`3`)을 꺼내서 `id` 변수에 넣는다.
+- **흐름**: `findById(id).get()` 으로 글을 찾고 → `postService.delete(post)` → 삭제된 글 정보를 응답(상태코드 기본값 `200`).
+- 아직 확인하지 않은 경우가 2가지 있다.
+  - 댓글이 달린 글(1번, 2번)을 지우면? → **3-2** 에서 테스트
+  - 없는 글(예: 999번)을 지우면? → **3-3** 에서 테스트
+
+### 기록: 앱을 실행해서 직접 요청 (`./gradlew bootRun` + `curl`)
+
+댓글이 없는 **3번 글** 을 삭제했다. 서버 로그에 `delete from post where id=?` 가 실행되었다.
+
+![3-1 curl 실행 결과](docs/images/step3-1-curl.png)
+
+### 테스트 결과
+- 이번 단계에는 새 테스트가 없다. 삭제 API 테스트는 **3-2** 에서 만든다.
+- 기존 테스트 15건은 그대로 통과(`BUILD SUCCESSFUL`).

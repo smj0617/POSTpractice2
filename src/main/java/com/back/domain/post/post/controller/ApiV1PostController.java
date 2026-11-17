@@ -47,4 +47,17 @@ public class ApiV1PostController {
 
         return new PostDto(post); // 엔티티 → DTO 로 바꿔서 응답 (JSON 으로 변환됨)
     }
+
+    // [3-1 추가] 글 삭제: DELETE /api/v1/posts/{id}
+    // 예) DELETE /api/v1/posts/3 → 3번 글 삭제
+    @DeleteMapping("/{id}")
+    public PostDto delete(
+            @PathVariable long id // 주소의 {id} 부분을 꺼내서 id 변수에 넣는다
+    ) {
+        Post post = postService.findById(id).get(); // 삭제할 글을 먼저 찾는다
+
+        postService.delete(post);
+
+        return new PostDto(post); // 삭제된 글의 정보를 응답 (상태코드는 기본값 200)
+    }
 }

@@ -35,4 +35,9 @@ public class PostService {
     public Optional<Post> findById(long id) {
         return postRepository.findById(id); // SELECT * FROM post WHERE id = ?
     }
+
+    // [3-1 추가] 글 삭제
+    public void delete(Post post) {
+        postRepository.delete(post); // DELETE FROM post WHERE id = ?
+    }
 }
