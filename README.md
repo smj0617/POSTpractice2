@@ -22,7 +22,9 @@
 | 3-1 | 글 삭제 API | ✅ 완료 |
 | 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ✅ 완료 |
 | 3-3 | 없는 글 삭제 + 실패 테스트 | ✅ 완료 |
-| 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
+| 4-1 | 댓글 작성 API | ✅ 완료 |
+| 4-2 | 댓글 작성 MockMvc 성공 테스트 | ⏳ 예정 |
+| 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
 
 ## 만들 API
@@ -594,3 +596,51 @@ ApiV1PostControllerTest > 글 삭제 실패 - 없는 글(999번)을 DELETE 하�
 
 ![3-3 After - ApiV1PostControllerTest](docs/images/step3-3-after.png)
 ![3-3 After - 전체 17건 통과](docs/images/step3-3-all.png)
+
+---
+
+## 4-1: 댓글 작성 API
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `postComment/dto/PostCommentDto.java` | 응답용 댓글 DTO (`id`, `createDate`, `modifyDate`, `postId`, `content`) |
+| 추가 | `postComment/controller/ApiV1PostCommentController.java` | `POST /api/v1/posts/{postId}/comments` → `write(postId, reqBody)` |
+| 수정 | `PostService.java` | `@Transactional writeComment(post, content)` 추가 (`addComment` + `flush`) |
+
+### 요청과 응답
+
+```http
+POST /api/v1/posts/1/comments
+Content-Type: application/json
+
+{"content": "새 댓글"}
+```
+
+```http
+HTTP/1.1 201
+Content-Type: application/json
+
+{"id":6,"createDate":"...","modifyDate":"...","postId":1,"content":"새 댓글"}
+```
+
+없는 글(`/api/v1/posts/999/comments`)에 달면 `404` (3-3 과 같은 `orElseThrow` 방식).
+
+### 핵심 포인트
+- **주소에 글 번호가 들어간다**: 댓글은 항상 어떤 글에 속하므로 `@RequestMapping("/api/v1/posts/{postId}/comments")`. `@PathVariable long postId` 로 꺼낸다.
+- **댓글은 글을 통해서 만든다**: `post.addComment(content)` → 1-6 샘플 댓글과 같은 방식. 댓글용 리포지터리 없이 `cascade = PERSIST` 로 저장된다.
+- **`@Transactional` 이 필요한 이유**: `addComment()` 는 `save()` 를 부르지 않는 "객체 수정"이다. 감싸는 트랜잭션이 있어야 JPA가 변화를 알아채서 INSERT 한다(1-6, 3-1 질문 참고).
+- **`flush()` 가 필요한 이유**: INSERT 는 원래 트랜잭션이 끝날 때 실행된다. 그 전에 응답을 만들면 댓글 `id` 가 `null` 이다. `flush()` 로 지금 바로 INSERT 해서 `id` 를 받는다.
+- **`PostCommentDto` 에는 글 전체가 아니라 `postId` 만**: 댓글 → 글 → 댓글 목록 → ... 순환참조를 막는다.
+- 아직 빈 댓글(`""`)도 저장된다 → **4-3** 에서 검증 추가.
+
+### 기록: 앱을 실행해서 직접 요청 (`./gradlew bootRun` + `curl`)
+
+샘플 댓글 5개 다음이므로 새 댓글은 **6번**. SQL 은 `select post` → `insert into post_comment` 순서로 실행되었다.
+
+![4-1 curl 실행 결과](docs/images/step4-1-curl.png)
+
+### 테스트 결과
+- 이번 단계에는 새 테스트가 없다. 댓글 작성 MockMvc 테스트는 **4-2** 에서 만든다.
+- 기존 테스트 17건은 그대로 통과(`BUILD SUCCESSFUL`).

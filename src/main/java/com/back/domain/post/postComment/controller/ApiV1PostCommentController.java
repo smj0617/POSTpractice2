@@ -1,0 +1,45 @@
+package com.back.domain.post.postComment.controller;
+
+import com.back.domain.post.post.entity.Post;
+import com.back.domain.post.post.service.PostService;
+import com.back.domain.post.postComment.dto.PostCommentDto;
+import com.back.domain.post.postComment.entity.PostComment;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.springframework.http.HttpStatus.CREATED;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
+// [4-1 추가] 댓글 API 입구
+// 댓글은 항상 "어떤 글의" 댓글이므로 주소에 글 번호(postId)가 들어간다
+//   예) POST /api/v1/posts/1/comments → 1번 글에 댓글 작성
+@RestController
+@RequestMapping("/api/v1/posts/{postId}/comments")
+@RequiredArgsConstructor
+public class ApiV1PostCommentController {
+    // 댓글은 글을 통해서 만들기 때문에 PostService 를 사용한다
+    private final PostService postService;
+
+    // 요청 본문 {"content": "..."} 을 담을 상자 (검증 규칙은 4-3 에서 추가)
+    record PostCommentWriteReqBody(
+            String content
+    ) {
+    }
+
+    // 댓글 작성: POST /api/v1/posts/{postId}/comments
+    @PostMapping
+    @ResponseStatus(CREATED) // 성공하면 201 Created
+    public PostCommentDto write(
+            @PathVariable long postId, // 주소의 {postId} → 몇 번 글에 달지
+            @RequestBody PostCommentWriteReqBody reqBody
+    ) {
+        // 댓글을 달 글을 먼저 찾는다. 없으면 404 (3-3 과 같은 방식)
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "%d번 글은 존재하지 않습니다.".formatted(postId)));
+
+        PostComment postComment = postService.writeComment(post, reqBody.content());
+
+        return new PostCommentDto(postComment); // 엔티티 → DTO 로 바꿔서 응답
+    }
+}

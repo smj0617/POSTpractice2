@@ -2,8 +2,10 @@ package com.back.domain.post.post.service;
 
 import com.back.domain.post.post.entity.Post;
 import com.back.domain.post.post.repository.PostRepository;
+import com.back.domain.post.postComment.entity.PostComment; // [4-1 추가]
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // [4-1 추가]
 
 import java.util.List;
 import java.util.Optional;
@@ -39,5 +41,20 @@ public class PostService {
     // [3-1 추가] 글 삭제
     public void delete(Post post) {
         postRepository.delete(post); // DELETE FROM post WHERE id = ?
+    }
+
+    // [4-1 추가] 댓글 작성
+    // 댓글은 글을 통해서 만든다(post.addComment) → 1-6 샘플 댓글과 같은 방식
+    // @Transactional : addComment() 는 save() 를 부르지 않는 "객체 수정"이라서
+    //                  트랜잭션 안에서 실행돼야 cascade PERSIST 로 저장된다 (1-6 참고)
+    @Transactional
+    public PostComment writeComment(Post post, String content) {
+        PostComment postComment = post.addComment(content); // 이 시점에는 댓글 id 가 null
+
+        // flush : 모아 둔 SQL 을 지금 바로 DB로 보낸다 → INSERT 실행 → 댓글 id 가 채워진다
+        // (안 하면 메서드가 끝날 때 INSERT 되므로, 응답에 id 가 null 로 나간다)
+        postRepository.flush();
+
+        return postComment;
     }
 }
