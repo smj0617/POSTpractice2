@@ -72,4 +72,53 @@ public class ApiV1PostCommentControllerTest {
         assertThat(postComment.getContent()).isEqualTo("새 댓글");
         assertThat(postComment.getPost()).isSameAs(post); // 1번 글에 연결됨
     }
+
+    // ---------- [4-3 추가] 실패 케이스 ----------
+
+    @Test
+    @DisplayName("댓글 작성 실패 - 내용이 비어 있으면 400 이고, 댓글이 저장되지 않는다")
+    void t2() throws Exception {
+        Post post = postService.findById(1).get();
+        int countBefore = post.getComments().size(); // 3
+
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/api/v1/posts/1/comments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                            "content": ""
+                                        }
+                                        """)
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("write"))
+                .andExpect(status().isBadRequest()); // 400
+
+        assertThat(post.getComments()).hasSize(countBefore); // 댓글 개수 그대로
+    }
+
+    @Test
+    @DisplayName("댓글 작성 실패 - 없는 글(999번)에 댓글을 달면 404")
+    void t3() throws Exception {
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/api/v1/posts/999/comments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                            "content": "새 댓글"
+                                        }
+                                        """)
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("write"))
+                .andExpect(status().isNotFound()); // 404
+    }
 }

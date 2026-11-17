@@ -4,6 +4,9 @@ import com.back.domain.post.post.entity.Post;
 import com.back.domain.post.post.service.PostService;
 import com.back.domain.post.postComment.dto.PostCommentDto;
 import com.back.domain.post.postComment.entity.PostComment;
+import jakarta.validation.Valid;                       // [4-3 추가]
+import jakarta.validation.constraints.NotBlank;        // [4-3 추가]
+import jakarta.validation.constraints.Size;            // [4-3 추가]
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,8 +24,13 @@ public class ApiV1PostCommentController {
     // 댓글은 글을 통해서 만들기 때문에 PostService 를 사용한다
     private final PostService postService;
 
-    // 요청 본문 {"content": "..."} 을 담을 상자 (검증 규칙은 4-3 에서 추가)
+    // 요청 본문 {"content": "..."} 을 담을 상자
+    // [4-3 추가] 검증 규칙 (2-3 글 작성과 같은 방식)
+    //   @NotBlank : null, "", "   "(공백만) 모두 안 됨
+    //   @Size     : 2 ~ 1000 글자
     record PostCommentWriteReqBody(
+            @NotBlank
+            @Size(min = 2, max = 1000)
             String content
     ) {
     }
@@ -32,7 +40,8 @@ public class ApiV1PostCommentController {
     @ResponseStatus(CREATED) // 성공하면 201 Created
     public PostCommentDto write(
             @PathVariable long postId, // 주소의 {postId} → 몇 번 글에 달지
-            @RequestBody PostCommentWriteReqBody reqBody
+            // [4-3 추가] @Valid : 위의 검증 규칙을 검사한다. 어기면 메서드가 실행되지 않고 400 응답
+            @RequestBody @Valid PostCommentWriteReqBody reqBody
     ) {
         // 댓글을 달 글을 먼저 찾는다. 없으면 404 (3-3 과 같은 방식)
         Post post = postService.findById(postId)

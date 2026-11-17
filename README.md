@@ -24,7 +24,7 @@
 | 3-3 | 없는 글 삭제 + 실패 테스트 | ✅ 완료 |
 | 4-1 | 댓글 작성 API | ✅ 완료 |
 | 4-2 | 댓글 작성 MockMvc 성공 테스트 | ✅ 완료 |
-| 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
+| 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
 
 ## 만들 API
@@ -680,3 +680,47 @@ Content-Type: application/json
 
 ![4-2 ApiV1PostCommentControllerTest](docs/images/step4-2-test.png)
 ![4-2 전체 18건 통과](docs/images/step4-2-all.png)
+
+---
+
+## 4-3: 댓글 작성 입력값 검증 + 실패 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `ApiV1PostCommentControllerTest.java` | 실패 테스트 2개 추가 (`t2` 빈 내용 → 400, `t3` 없는 글 → 404) |
+| 수정 | `ApiV1PostCommentController.java` | `PostCommentWriteReqBody.content` 에 `@NotBlank`, `@Size(min = 2, max = 1000)` / 파라미터에 `@Valid` |
+
+### 진행 순서: 테스트 먼저 → 실패 확인 → 기능 추가 → 통과
+
+**Before: 실패 테스트를 먼저 작성하고 실행** — 검증이 없으니 빈 댓글도 저장되어 `201` 이 나왔다. `t3`(404)는 4-1 에서 이미 `orElseThrow` 를 만들어 두어서 처음부터 통과.
+
+```
+ApiV1PostCommentControllerTest > 댓글 작성 실패 - 내용이 비어 있으면 400 이고, 댓글이 저장되지 않는다 FAILED
+    java.lang.AssertionError: Status expected:<400> but was:<201>
+3 tests completed, 1 failed
+```
+
+![4-3 Before - 실패한 테스트](docs/images/step4-3-before.png)
+![4-3 Before - 실패 상세](docs/images/step4-3-before-detail.png)
+
+**After: `@Valid` + `@NotBlank`, `@Size` 추가** — 검증에 걸리면 `write()` 가 실행되지 않고 `400` 이 응답된다.
+
+![4-3 After - print 출력](docs/images/step4-3-print.png)
+
+### 핵심 포인트
+- 2-3 글 작성 검증과 **완전히 같은 방식**이다. 요청 상자(record)의 필드에 규칙을 달고, 컨트롤러 파라미터에 `@Valid` 를 붙인다.
+- **검사 순서**: `@Valid` 검사(400)가 메서드 실행보다 먼저다. 그래서 내용이 빈 채로 없는 글에 요청하면 404 가 아니라 400 이 나온다.
+- **`t2` 의 개수 검사**: 요청 전에 `post.getComments().size()` 를 저장하고, 요청 후 같은 목록의 크기가 그대로인지 확인한다. (한 트랜잭션 안이라 같은 `post` 객체를 계속 본다.)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostCommentControllerTest.t2` | 내용 `""` → `400`, 댓글 개수 그대로 | ✅ 통과 |
+| `ApiV1PostCommentControllerTest.t3` | 없는 글(999) → `404` | ✅ 통과 |
+| 기존 테스트 18건 | | ✅ 통과 |
+
+![4-3 After - ApiV1PostCommentControllerTest](docs/images/step4-3-after.png)
+![4-3 After - 전체 20건 통과](docs/images/step4-3-all.png)
