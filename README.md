@@ -15,7 +15,7 @@
 | 1-3 | `PostRepository` + `PostService` + 테스트 | ✅ 완료 |
 | 1-4 | 샘플 글 3건 자동 생성 + 테스트 | ✅ 완료 |
 | 1-5 | `PostComment` 엔티티 + `post.addComment()` | ✅ 완료 |
-| 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ⏳ 예정 |
+| 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ✅ 완료 |
 | 2-1 ~ 2-3 | 글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 3-1 ~ 3-3 | 글 삭제 API → 성공 테스트 → 없는 글 삭제·실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
@@ -243,3 +243,70 @@ alter table if exists post_comment
 | 기존 테스트 9건 | | ✅ 통과 |
 
 ![1-5 테스트 결과](docs/images/step1-5-test.png)
+
+---
+
+## 1-6: 샘플 댓글 5건 자동 생성 + 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `BaseInitData.java` | 샘플 댓글 5건 추가, `work1()` 에 `@Transactional`, `self.work1()` 로 호출 |
+| 수정 | `Post.java` | `@OneToMany(mappedBy = "post", cascade = PERSIST)` — `cascade` 추가 |
+| 수정 | `BaseInitDataTest.java` | 댓글 테스트 2개 추가 (`t3`, `t4`) |
+
+### 샘플 데이터 (1단계 최종)
+
+| 글 | 댓글 |
+|---|---|
+| 1번 `제목 1` | `댓글 1-1`, `댓글 1-2`, `댓글 1-3` |
+| 2번 `제목 2` | `댓글 2-1`, `댓글 2-2` |
+| 3번 `제목 3` | (없음) |
+
+### 핵심 포인트
+- **`@Transactional`**: `work1()` 전체를 하나의 트랜잭션으로 묶는다. 트랜잭션이 끝날 때 JPA가 그 사이 바뀐 내용(새 댓글)을 모아서 DB에 반영한다.
+- **`self.work1()`**: `@Transactional` 은 스프링이 만든 프록시를 거쳐 호출될 때만 동작한다. `this.work1()` 로 부르면 무시된다.
+- **`cascade = PERSIST`**: 글이 저장될 때, 글의 `comments` 에 새로 들어간 댓글도 같이 저장한다. 그래서 댓글마다 `save()` 를 부르지 않아도 된다.
+
+### Before: `cascade` 없이 실행 → 댓글이 하나도 저장되지 않음
+
+`addComment()` 는 자바 객체끼리 연결만 할 뿐, JPA에게 "이 댓글도 저장해"라고 알려 주지 않는다. 에러도 나지 않고 조용히 저장이 안 된다. 테스트가 아니었으면 놓치기 쉬운 문제다.
+
+```
+BaseInitDataTest > 앱이 시작되면 샘플 댓글 5건이 DB에 저장되어 있다 FAILED
+    expected: 5
+     but was: 0
+BaseInitDataTest > 1번 글에 댓글 3건, 2번 글에 댓글 2건, 3번 글에는 댓글이 없다 FAILED
+12 tests completed, 2 failed
+
+실행된 insert into post_comment 횟수: 0
+```
+
+![1-6 Before - 실패한 테스트](docs/images/step1-6-before.png)
+![1-6 Before - 실패 상세](docs/images/step1-6-before-detail.png)
+
+### After: `cascade = PERSIST` 추가 → 댓글 5건 저장
+
+```java
+@OneToMany(mappedBy = "post", cascade = PERSIST)
+private List<PostComment> comments = new ArrayList<>();
+```
+
+```sql
+-- 5번 실행됨 (댓글 1-1, 1-2, 1-3, 2-1, 2-2)
+insert into post_comment (content, create_date, modify_date, post_id, id)
+values (?, ?, ?, ?, default)
+```
+
+![1-6 After - 통과](docs/images/step1-6-after.png)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `BaseInitDataTest.t3` | 앱이 시작되면 샘플 댓글 5건이 DB에 있다 | ✅ 통과 |
+| `BaseInitDataTest.t4` | 1번 글 댓글 3건, 2번 글 2건, 3번 글 0건 (내용까지 확인) | ✅ 통과 |
+| 전체 | 12건 | ✅ 통과 |
+
+![1-6 전체 테스트 결과](docs/images/step1-6-all.png)

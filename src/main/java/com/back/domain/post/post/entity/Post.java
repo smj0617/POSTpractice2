@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import java.util.ArrayList;
 import java.util.List;
 
+import static jakarta.persistence.CascadeType.PERSIST;
 import static lombok.AccessLevel.PROTECTED;
 
 // @Entity 가 붙으면 이 클래스를 보고 DB에 post 테이블이 만들어진다
@@ -27,7 +28,9 @@ public class Post extends BaseEntity {
     // [1-5 추가] 글 1개 : 댓글 N개 (One 글 To Many 댓글)
     // mappedBy = "post" : 외래키(post_id)는 내가 아니라 PostComment 의 post 필드가 관리한다는 뜻
     //                     → post 테이블에는 칼럼이 생기지 않는다
-    @OneToMany(mappedBy = "post")
+    // [1-6 추가] cascade = PERSIST : 글을 저장(영속화)할 때, comments 에 새로 추가된 댓글도 같이 저장한다
+    //                               → 댓글마다 save() 를 부르지 않아도 INSERT 된다
+    @OneToMany(mappedBy = "post", cascade = PERSIST)
     private List<PostComment> comments = new ArrayList<>();
 
     // 글을 만들 때는 이 생성자를 쓴다 (id, 날짜는 저장할 때 자동으로 채워짐)
