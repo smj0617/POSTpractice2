@@ -3,6 +3,9 @@ package com.back.domain.post.post.controller;
 import com.back.domain.post.post.dto.PostDto;
 import com.back.domain.post.post.entity.Post;
 import com.back.domain.post.post.service.PostService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,8 +21,16 @@ public class ApiV1PostController {
 
     // 요청 본문(JSON)을 담을 상자
     // {"title": "...", "content": "..."} → PostWriteReqBody(title, content)
+    // [2-3 추가] 검증 규칙
+    //   @NotBlank : null, "", "   "(공백만) 모두 안 됨
+    //   @Size     : 글자 수 범위
     record PostWriteReqBody(
+            @NotBlank
+            @Size(min = 2, max = 100)
             String title,
+
+            @NotBlank
+            @Size(min = 2, max = 5000)
             String content
     ) {
     }
@@ -28,7 +39,9 @@ public class ApiV1PostController {
     @PostMapping
     @ResponseStatus(CREATED) // 성공하면 201 Created (새로 만들어졌다는 뜻)
     public PostDto write(
-            @RequestBody PostWriteReqBody reqBody // 요청 본문의 JSON 을 PostWriteReqBody 로 변환
+            // 요청 본문의 JSON 을 PostWriteReqBody 로 변환
+            // [2-3 추가] @Valid : 위의 검증 규칙을 검사한다. 어기면 메서드가 실행되지 않고 400 응답
+            @RequestBody @Valid PostWriteReqBody reqBody
     ) {
         Post post = postService.write(reqBody.title(), reqBody.content());
 

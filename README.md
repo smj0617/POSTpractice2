@@ -18,7 +18,7 @@
 | 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ✅ 완료 |
 | 2-1 | 글 작성 API (`ApiV1PostController`, `PostDto`) | ✅ 완료 |
 | 2-2 | 글 작성 MockMvc 성공 테스트 | ✅ 완료 |
-| 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
+| 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 3-1 ~ 3-3 | 글 삭제 API → 성공 테스트 → 없는 글 삭제·실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
@@ -394,3 +394,55 @@ Content-Type: application/json
 | 기존 테스트 12건 | | ✅ 통과 |
 
 ![2-2 테스트 결과](docs/images/step2-2-test.png)
+
+---
+
+## 2-3: 글 작성 입력값 검증 + 실패 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `build.gradle.kts` | `spring-boot-starter-validation` 추가 |
+| 수정 | `ApiV1PostController.java` | `PostWriteReqBody` 에 `@NotBlank`, `@Size` / 파라미터에 `@Valid` |
+| 수정 | `ApiV1PostControllerTest.java` | 실패 테스트 2개 추가 (`t2`, `t3`) |
+
+### 검증 규칙
+
+| 필드 | 규칙 |
+|---|---|
+| `title` | `@NotBlank` (null, `""`, 공백만 X) + `@Size(min = 2, max = 100)` |
+| `content` | `@NotBlank` + `@Size(min = 2, max = 5000)` |
+
+### 진행 순서: 테스트 먼저 → 실패 확인 → 기능 추가 → 통과
+
+**Before: 실패 테스트를 먼저 작성하고 실행** — 검증이 없으니 빈 제목도 저장되어 `201` 이 나왔다.
+
+```
+ApiV1PostControllerTest > 글 작성 실패 - 제목이 비어 있으면 400 이고, 글이 저장되지 않는다 FAILED
+    java.lang.AssertionError: Status expected:<400> but was:<201>
+ApiV1PostControllerTest > 글 작성 실패 - 내용이 공백뿐이면 400 이고, 글이 저장되지 않는다 FAILED
+15 tests completed, 2 failed
+```
+
+![2-3 Before - 실패한 테스트](docs/images/step2-3-before.png)
+![2-3 Before - 실패 상세](docs/images/step2-3-before-detail.png)
+
+**After: `@Valid` + `@NotBlank`, `@Size` 추가** — 검증에 걸리면 `write()` 안의 코드가 실행되지 않고 `400` 이 응답된다.
+
+![2-3 After - print 출력](docs/images/step2-3-print.png)
+
+### 핵심 포인트
+- **`@Valid`**: 이게 붙어야 `PostWriteReqBody` 의 검증 규칙을 실제로 검사한다. 빼면 규칙이 있어도 무시된다.
+- 검증에 실패하면 스프링이 `MethodArgumentNotValidException` 을 던지고 **400 Bad Request** 로 응답한다. 컨트롤러 메서드 본문은 실행되지 않으므로 DB에 저장되지 않는다.
+- 지금은 400 응답의 본문이 비어 있다. "무엇이 잘못됐는지" 알려 주는 에러 메시지는 아직 없다.
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostControllerTest.t2` | 제목이 `""` → `400`, 글 개수 그대로 | ✅ 통과 |
+| `ApiV1PostControllerTest.t3` | 내용이 `"   "` → `400`, 글 개수 그대로 | ✅ 통과 |
+| 기존 테스트 13건 | | ✅ 통과 |
+
+![2-3 After - 테스트 결과](docs/images/step2-3-after.png)

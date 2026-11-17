@@ -66,4 +66,58 @@ public class ApiV1PostControllerTest {
         assertThat(post.getTitle()).isEqualTo("새 글 제목");
         assertThat(post.getContent()).isEqualTo("새 글 내용");
     }
+
+    // ---------- [2-3 추가] 실패 케이스 ----------
+
+    @Test
+    @DisplayName("글 작성 실패 - 제목이 비어 있으면 400 이고, 글이 저장되지 않는다")
+    void t2() throws Exception {
+        long countBefore = postService.count();
+
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/api/v1/posts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                            "title": "",
+                                            "content": "새 글 내용"
+                                        }
+                                        """)
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostController.class))
+                .andExpect(handler().methodName("write"))
+                .andExpect(status().isBadRequest()); // 400 : 요청이 잘못되었다
+
+        assertThat(postService.count()).isEqualTo(countBefore); // 글 개수가 그대로
+    }
+
+    @Test
+    @DisplayName("글 작성 실패 - 내용이 공백뿐이면 400 이고, 글이 저장되지 않는다")
+    void t3() throws Exception {
+        long countBefore = postService.count();
+
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/api/v1/posts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                            "title": "새 글 제목",
+                                            "content": "   "
+                                        }
+                                        """)
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostController.class))
+                .andExpect(handler().methodName("write"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(postService.count()).isEqualTo(countBefore);
+    }
 }
