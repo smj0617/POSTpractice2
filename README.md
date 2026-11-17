@@ -17,7 +17,7 @@
 | 1-5 | `PostComment` 엔티티 + `post.addComment()` | ✅ 완료 |
 | 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ✅ 완료 |
 | 2-1 | 글 작성 API (`ApiV1PostController`, `PostDto`) | ✅ 완료 |
-| 2-2 | 글 작성 MockMvc 성공 테스트 | ⏳ 예정 |
+| 2-2 | 글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
 | 3-1 ~ 3-3 | 글 삭제 API → 성공 테스트 → 없는 글 삭제·실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
@@ -359,3 +359,38 @@ Content-Type: application/json
 ### 테스트 결과
 - 이번 단계에는 새 테스트가 없다. API 테스트(MockMvc)는 **2-2** 에서 만든다.
 - 기존 테스트 12건은 그대로 통과(`BUILD SUCCESSFUL`).
+
+---
+
+## 2-2: 글 작성 MockMvc 성공 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `test/.../controller/ApiV1PostControllerTest.java` | 글 작성 API 테스트 |
+| 수정 | `PostService.java` | `findById(id)` 추가 (테스트에서 DB에 저장된 글을 꺼내 보려고) |
+
+### 핵심 포인트
+- **MockMvc**: 실제 서버(8080)를 켜지 않고, 컨트롤러에 HTTP 요청을 보낸 것처럼 흉내 낸다. 2-1 에서 `bootRun` + `curl` 로 손으로 하던 확인을 자동화한 것.
+- **`@AutoConfigureMockMvc`**: 테스트에서 `MockMvc` 를 주입받을 수 있게 준비해 준다.
+- **테스트 구조**
+  1. `mvc.perform(post(...))` 로 요청을 보낸다
+  2. `postService.findById(4)` 로 DB에 저장된 글을 꺼낸다
+  3. 응답 검사: 처리한 컨트롤러·메서드, 상태코드 `201`, 응답 JSON 의 **모든 필드**(`id`, `createDate`, `modifyDate`, `title`, `content`)
+  4. DB 검사: 요청한 제목·내용 그대로 저장되었는지
+- **`andDo(print())`**: 요청과 응답 내용을 로그로 출력한다. 테스트가 실패했을 때 원인을 찾기 좋다.
+- **`Optional`**: `findById` 는 글이 없을 수도 있으므로 `Optional<Post>` 로 돌려준다. `.get()` 으로 꺼낸다.
+
+### 기록: `andDo(print())` 출력
+
+![2-2 print 출력](docs/images/step2-2-print.png)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostControllerTest.t1` | `POST /api/v1/posts` → `write` 메서드가 처리, `201`, 응답 JSON 5개 필드, DB 저장 내용 | ✅ 통과 |
+| 기존 테스트 12건 | | ✅ 통과 |
+
+![2-2 테스트 결과](docs/images/step2-2-test.png)

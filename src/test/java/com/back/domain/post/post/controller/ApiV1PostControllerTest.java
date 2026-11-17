@@ -1,0 +1,69 @@
+package com.back.domain.post.post.controller;
+
+import com.back.domain.post.post.entity.Post;
+import com.back.domain.post.post.service.PostService;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@AutoConfigureMockMvc // MockMvc 를 준비해 준다
+@Transactional        // 테스트에서 작성한 글은 끝나면 롤백 → 다른 테스트에 영향 없음
+public class ApiV1PostControllerTest {
+    // MockMvc: 실제 서버(8080)를 켜지 않고, 컨트롤러에 HTTP 요청을 보낸 것처럼 흉내 내는 도구
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private PostService postService;
+
+    @Test
+    @DisplayName("글 작성 - POST /api/v1/posts 요청하면 201 과 작성된 글이 응답된다")
+    void t1() throws Exception {
+        // ① 요청 보내기 (2-1 의 curl 과 같은 요청)
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/api/v1/posts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                            "title": "새 글 제목",
+                                            "content": "새 글 내용"
+                                        }
+                                        """)
+                )
+                .andDo(print()); // 요청/응답 내용을 콘솔에 출력 (테스트 리포트에서 확인 가능)
+
+        // ② DB에 실제로 저장된 글 꺼내기 (샘플 글 1, 2, 3 다음이므로 4번)
+        Post post = postService.findById(4).get();
+
+        // ③ 응답 검사: 어떤 메서드가 처리했는지, 상태코드, 응답 JSON 의 모든 필드
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostController.class)) // 이 컨트롤러가
+                .andExpect(handler().methodName("write"))                     // write 메서드로 처리했다
+                .andExpect(status().isCreated())                              // 201
+                .andExpect(jsonPath("$.id").value(post.getId()))
+                .andExpect(jsonPath("$.createDate").value(startsWith(post.getCreateDate().toString().substring(0, 20))))
+                .andExpect(jsonPath("$.modifyDate").value(startsWith(post.getModifyDate().toString().substring(0, 20))))
+                .andExpect(jsonPath("$.title").value("새 글 제목"))
+                .andExpect(jsonPath("$.content").value("새 글 내용"));
+
+        // ④ DB 검사: 요청한 내용 그대로 저장되었는지
+        assertThat(post.getTitle()).isEqualTo("새 글 제목");
+        assertThat(post.getContent()).isEqualTo("새 글 내용");
+    }
+}
