@@ -3,6 +3,7 @@ package com.back.domain.post.postComment.controller;
 import com.back.domain.post.post.entity.Post;
 import com.back.domain.post.post.service.PostService;
 import com.back.domain.post.postComment.entity.PostComment;
+import jakarta.persistence.EntityManager; // [5-2 추가]
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete; // [5-2 추가]
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -33,6 +35,10 @@ public class ApiV1PostCommentControllerTest {
 
     @Autowired
     private PostService postService;
+
+    // [5-2 추가] JPA 가 객체를 관리하는 곳(영속성 컨텍스트)을 직접 다루는 도구
+    @Autowired
+    private EntityManager em;
 
     @Test
     @DisplayName("댓글 작성 - POST /api/v1/posts/1/comments 요청하면 201 과 작성된 댓글이 응답된다")
@@ -120,5 +126,41 @@ public class ApiV1PostCommentControllerTest {
                 .andExpect(handler().handlerType(ApiV1PostCommentController.class))
                 .andExpect(handler().methodName("write"))
                 .andExpect(status().isNotFound()); // 404
+    }
+
+    // ---------- [5-2 추가] 댓글 삭제 ----------
+
+    @Test
+    @DisplayName("댓글 삭제 - DELETE /api/v1/posts/1/comments/2 요청하면 200 과 삭제된 댓글이 응답되고, DB에서 사라진다")
+    void t4() throws Exception {
+        // ① 요청 보내기 (5-1 의 curl 과 같은 요청)
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/1/comments/2")
+                )
+                .andDo(print());
+
+        // ② 응답 검사
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isOk()) // 200
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.postId").value(1))
+                .andExpect(jsonPath("$.content").value("댓글 1-2"));
+
+        // ③ 지금까지 모아 둔 SQL 을 DB로 보내고(flush), JPA 가 기억하던 객체를 모두 비운다(clear)
+        //    → 테스트 전체가 @Transactional 이라 그냥 두면 DELETE 가 DB까지 가지 않은 채 롤백된다
+        //    → clear 후 다시 조회하면 메모리가 아니라 진짜 DB에서 읽어 온다
+        em.flush();
+        em.clear();
+
+        // ④ DB 검사: 1번 글의 댓글이 3개 → 2개, 2번 댓글은 없다
+        Post post = postService.findById(1).get();
+        assertThat(post.getComments()).hasSize(2);
+        assertThat(post.getComments())
+                .extracting(PostComment::getContent)
+                .containsExactly("댓글 1-1", "댓글 1-3");
+        assertThat(post.findCommentById(2)).isEmpty();
     }
 }

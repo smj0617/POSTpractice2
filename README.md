@@ -26,7 +26,7 @@
 | 4-2 | 댓글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 5-1 | 댓글 삭제 API | ✅ 완료 |
-| 5-2 | 댓글 삭제 MockMvc 성공 테스트 | ⏳ 예정 |
+| 5-2 | 댓글 삭제 MockMvc 성공 테스트 | ✅ 완료 |
 | 5-3 | 없는 댓글·다른 글의 댓글 삭제 실패 테스트 | ⏳ 예정 |
 
 ## 만들 API
@@ -775,3 +775,38 @@ Content-Type: application/json
 ### 테스트 결과
 - 이번 단계에는 새 테스트가 없다. 댓글 삭제 MockMvc 테스트는 **5-2** 에서 만든다.
 - 기존 테스트 20건은 그대로 통과(`BUILD SUCCESSFUL`).
+
+---
+
+## 5-2: 댓글 삭제 MockMvc 성공 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `ApiV1PostCommentControllerTest.java` | `EntityManager em` 주입, 댓글 삭제 성공 테스트 `t4` 추가 |
+
+### 테스트 흐름
+1. **요청**: `DELETE /api/v1/posts/1/comments/2` (5-1 의 curl 과 같은 요청)
+2. **응답 검사**: 처리한 컨트롤러·메서드(`delete`), `200`, JSON 의 `id=2`, `postId=1`, `content=댓글 1-2`
+3. **`em.flush()` + `em.clear()`**: 모아 둔 DELETE 를 DB로 보내고, JPA 가 기억하던 객체를 비운다
+4. **DB 검사**: 1번 글을 다시 조회 → 댓글 2개(`댓글 1-1`, `댓글 1-3`), `findCommentById(2)` 비어 있음
+
+### 핵심 포인트
+- **왜 `flush` 가 필요한가**: 테스트 전체가 `@Transactional` 이라 서비스의 트랜잭션이 테스트 트랜잭션에 합류한다. `orphanRemoval` 의 DELETE 는 트랜잭션이 끝날 때 실행되는데, 테스트는 롤백으로 끝나므로 **그냥 두면 DELETE 가 DB까지 가지 않는다.** `flush()` 로 지금 보낸다.
+- **왜 `clear` 가 필요한가**: JPA 는 한 번 꺼낸 객체를 기억해 두었다가(1차 캐시) 같은 것을 다시 찾으면 메모리의 객체를 돌려준다. 그러면 "목록에서 뺐다"는 것만 확인할 뿐, DB에서 지워졌는지는 모른다. `clear()` 후 다시 조회하면 **진짜 DB에서** 읽어 온다(로그에 `select` 가 다시 찍힘).
+- **`extracting(PostComment::getContent).containsExactly(...)`**: 댓글 목록에서 내용만 뽑아 순서까지 정확히 같은지 확인한다.
+
+### 기록: `andDo(print())` 출력 + SQL
+
+![5-2 print 출력](docs/images/step5-2-print.png)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostCommentControllerTest.t4` | `DELETE /api/v1/posts/1/comments/2` → `200`, 응답 필드, DB 재조회 시 댓글 3 → 2개 | ✅ 통과 |
+| 기존 테스트 20건 | | ✅ 통과 |
+
+![5-2 ApiV1PostCommentControllerTest](docs/images/step5-2-test.png)
+![5-2 전체 21건 통과](docs/images/step5-2-all.png)
