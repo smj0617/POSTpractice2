@@ -16,7 +16,9 @@
 | 1-4 | 샘플 글 3건 자동 생성 + 테스트 | ✅ 완료 |
 | 1-5 | `PostComment` 엔티티 + `post.addComment()` | ✅ 완료 |
 | 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ✅ 완료 |
-| 2-1 ~ 2-3 | 글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
+| 2-1 | 글 작성 API (`ApiV1PostController`, `PostDto`) | ✅ 완료 |
+| 2-2 | 글 작성 MockMvc 성공 테스트 | ⏳ 예정 |
+| 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
 | 3-1 ~ 3-3 | 글 삭제 API → 성공 테스트 → 없는 글 삭제·실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
@@ -310,3 +312,50 @@ values (?, ?, ?, ?, default)
 | 전체 | 12건 | ✅ 통과 |
 
 ![1-6 전체 테스트 결과](docs/images/step1-6-all.png)
+
+---
+
+## 2-1: 글 작성 API
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `domain/post/post/controller/ApiV1PostController.java` | `POST /api/v1/posts` 요청을 받아 글 작성 |
+| 추가 | `domain/post/post/dto/PostDto.java` | 응답으로 내보낼 글 데이터(`id`, `createDate`, `modifyDate`, `title`, `content`) |
+
+### 요청과 응답
+
+```http
+POST /api/v1/posts
+Content-Type: application/json
+
+{"title": "새 글 제목", "content": "새 글 내용"}
+```
+
+```http
+HTTP/1.1 201
+Content-Type: application/json
+
+{"id":4,"createDate":"...","modifyDate":"...","title":"새 글 제목","content":"새 글 내용"}
+```
+
+### 핵심 포인트
+- **흐름**: 요청 → `ApiV1PostController.write()` → `PostService.write()` (1-3) → `PostRepository.save()` → DB
+- **`@RestController`**: 메서드가 돌려준 객체를 JSON 으로 바꿔서 응답한다.
+- **`@RequestBody`**: 요청 본문의 JSON 을 `PostWriteReqBody` 객체로 바꿔 준다.
+- **`@ResponseStatus(CREATED)`**: 성공 시 상태코드 `201`. "새로 만들어졌다"는 뜻.
+- **`PostDto`**: 엔티티(`Post`)를 그대로 응답하지 않는다.
+  - 엔티티에는 `comments` 가 있고 댓글에는 다시 `post` 가 있어서, 그대로 JSON 으로 바꾸면 끝없이 이어질 수 있다(순환참조).
+  - 응답에 보여 줄 칸만 골라 담으면 엔티티가 바뀌어도 API 응답 모양은 그대로 유지된다.
+- **`record`**: 필드, 생성자, 값 꺼내는 메서드(`title()` 등)를 자동으로 만들어 주는 간단한 클래스.
+
+### 기록: 앱을 실행해서 직접 요청 (`./gradlew bootRun` + `curl`)
+
+샘플 글 1, 2, 3 다음 번호인 **4번** 으로 저장되었다.
+
+![2-1 curl 실행 결과](docs/images/step2-1-curl.png)
+
+### 테스트 결과
+- 이번 단계에는 새 테스트가 없다. API 테스트(MockMvc)는 **2-2** 에서 만든다.
+- 기존 테스트 12건은 그대로 통과(`BUILD SUCCESSFUL`).
