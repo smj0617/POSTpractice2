@@ -27,7 +27,9 @@
 | 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 5-1 | 댓글 삭제 API | ✅ 완료 |
 | 5-2 | 댓글 삭제 MockMvc 성공 테스트 | ✅ 완료 |
-| 5-3 | 없는 댓글·다른 글의 댓글 삭제 실패 테스트 | ⏳ 예정 |
+| 5-3 | 없는 댓글·다른 글의 댓글 삭제 실패 테스트 | ✅ 완료 |
+
+**전체 완료** — 테스트 24건 모두 통과. 요약은 맨 아래 [최종 결과](#최종-결과) 참고.
 
 ## 만들 API
 
@@ -810,3 +812,80 @@ Content-Type: application/json
 
 ![5-2 ApiV1PostCommentControllerTest](docs/images/step5-2-test.png)
 ![5-2 전체 21건 통과](docs/images/step5-2-all.png)
+
+---
+
+## 5-3: 없는 댓글·다른 글의 댓글 삭제 실패 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `ApiV1PostCommentControllerTest.java` | 실패 테스트 3개 추가 (`t5`, `t6`, `t7`) |
+
+메인 코드는 바뀌지 않았다. 5-1 에서 만든 404 처리가 제대로 동작하는지 테스트로 고정해 두는 단계다. 그래서 세 테스트 모두 **처음부터 통과**했다(Before 실패 없음).
+
+### 실패 케이스
+
+| 테스트 | 요청 | 결과 | 어디서 멈추나 |
+|---|---|---|---|
+| `t5` 없는 댓글 | `DELETE /api/v1/posts/1/comments/999` | `404` "999번 댓글은 존재하지 않습니다." | ② `post.findCommentById(999)` |
+| `t6` 다른 글의 댓글 | `DELETE /api/v1/posts/2/comments/1` | `404` "1번 댓글은 존재하지 않습니다." | ② 2번 글의 댓글 목록에 1번이 없음 |
+| `t7` 없는 글 | `DELETE /api/v1/posts/999/comments/1` | `404` "999번 글은 존재하지 않습니다." | ① `findById(999)` |
+
+![5-3 print 출력 요약](docs/images/step5-3-print.png)
+
+### 핵심 포인트
+- **`t6` 이 가장 중요하다**: 1번 댓글은 DB에 실제로 있지만 1번 글 소속이다. 댓글을 **글의 목록 안에서만** 찾기 때문에 2번 글 주소로는 지울 수 없다. 만약 댓글을 id 만으로 찾았다면 다른 글의 댓글이 지워지는 버그가 생긴다.
+- `t6` 은 `em.flush()` + `em.clear()` 후 다시 조회해서 1번 댓글이 **DB에 그대로 남아 있는지**까지 확인한다(5-2 와 같은 방법).
+- 이미 동작하는 기능도 테스트로 남겨 두면, 나중에 코드를 고치다 실수로 깨뜨렸을 때 바로 알 수 있다.
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostCommentControllerTest.t5` | 없는 댓글 → `404`, 1번 글 댓글 3개 그대로 | ✅ 통과 |
+| `ApiV1PostCommentControllerTest.t6` | 다른 글의 댓글 → `404`, 1번 댓글 DB에 남아 있음 | ✅ 통과 |
+| `ApiV1PostCommentControllerTest.t7` | 없는 글 → `404` | ✅ 통과 |
+| 기존 테스트 21건 | | ✅ 통과 |
+
+![5-3 ApiV1PostCommentControllerTest](docs/images/step5-3-test.png)
+![5-3 전체 24건 통과](docs/images/step5-3-all.png)
+
+---
+
+## 최종 결과
+
+### 완성된 API
+
+| 메서드 | URL | 성공 | 실패 |
+|---|---|---|---|
+| POST | `/api/v1/posts` | `201` 작성된 글 | `400` 제목·내용 검증 실패 |
+| DELETE | `/api/v1/posts/{id}` | `200` 삭제된 글 (댓글도 함께 삭제) | `404` 없는 글 |
+| POST | `/api/v1/posts/{postId}/comments` | `201` 작성된 댓글 | `400` 내용 검증 실패 / `404` 없는 글 |
+| DELETE | `/api/v1/posts/{postId}/comments/{id}` | `200` 삭제된 댓글 | `404` 없는 글 / 없는 댓글 / 다른 글의 댓글 |
+
+### 테스트 24건
+
+| 테스트 클래스 | 건수 | 내용 |
+|---|---|---|
+| `BackApplicationTests` | 1 | 앱 실행 |
+| `PostTest` | 4 | `Post` 엔티티 단위 테스트 |
+| `PostServiceTest` | 3 | 글 개수·작성 |
+| `BaseInitDataTest` | 4 | 샘플 글 3건·댓글 5건 |
+| `ApiV1PostControllerTest` | 5 | 글 작성 1 + 작성 실패 2 + 삭제 1 + 삭제 실패 1 |
+| `ApiV1PostCommentControllerTest` | 7 | 댓글 작성 1 + 작성 실패 2 + 삭제 1 + 삭제 실패 3 |
+
+### 단계별로 배운 JPA 설정 (`Post.comments`)
+
+```java
+@OneToMany(mappedBy = "post", cascade = {PERSIST, REMOVE}, orphanRemoval = true)
+private List<PostComment> comments = new ArrayList<>();
+```
+
+| 설정 | 의미 | 단계 |
+|---|---|---|
+| `mappedBy = "post"` | 외래키는 `PostComment.post` 가 관리 | 1-5 |
+| `cascade = PERSIST` | 글을 저장할 때 새 댓글도 저장 | 1-6 |
+| `cascade = REMOVE` | 글을 삭제할 때 댓글도 삭제 | 3-2 |
+| `orphanRemoval = true` | 목록에서 뺀 댓글을 삭제 | 5-1 |

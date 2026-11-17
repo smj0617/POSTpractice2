@@ -163,4 +163,58 @@ public class ApiV1PostCommentControllerTest {
                 .containsExactly("댓글 1-1", "댓글 1-3");
         assertThat(post.findCommentById(2)).isEmpty();
     }
+
+    // ---------- [5-3 추가] 댓글 삭제 실패 ----------
+
+    @Test
+    @DisplayName("댓글 삭제 실패 - 없는 댓글(999번)을 DELETE 하면 404")
+    void t5() throws Exception {
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/1/comments/999")
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isNotFound()); // 404
+
+        assertThat(postService.findById(1).get().getComments()).hasSize(3); // 1번 글의 댓글 그대로
+    }
+
+    @Test
+    @DisplayName("댓글 삭제 실패 - 다른 글의 댓글(1번 댓글은 1번 글 소속)을 2번 글 주소로 DELETE 하면 404 이고, 댓글은 남아 있다")
+    void t6() throws Exception {
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/2/comments/1")
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isNotFound()); // 404
+
+        // 1번 댓글은 1번 글에 그대로 있다
+        em.flush();
+        em.clear();
+        assertThat(postService.findById(1).get().findCommentById(1)).isPresent();
+    }
+
+    @Test
+    @DisplayName("댓글 삭제 실패 - 없는 글(999번)의 댓글을 DELETE 하면 404")
+    void t7() throws Exception {
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/999/comments/1")
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostCommentController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isNotFound()); // 404
+    }
 }
