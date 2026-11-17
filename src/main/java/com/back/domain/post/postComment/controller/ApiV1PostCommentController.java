@@ -51,4 +51,25 @@ public class ApiV1PostCommentController {
 
         return new PostCommentDto(postComment); // 엔티티 → DTO 로 바꿔서 응답
     }
+
+    // [5-1 추가] 댓글 삭제: DELETE /api/v1/posts/{postId}/comments/{id}
+    // 예) DELETE /api/v1/posts/1/comments/2 → 1번 글의 2번 댓글 삭제
+    @DeleteMapping("/{id}")
+    public PostCommentDto delete(
+            @PathVariable long postId, // 몇 번 글의
+            @PathVariable long id      // 몇 번 댓글
+    ) {
+        // ① 글 찾기. 없으면 404
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "%d번 글은 존재하지 않습니다.".formatted(postId)));
+
+        // ② 그 글의 댓글 중에서 찾기. 없으면 404
+        PostComment postComment = post.findCommentById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "%d번 댓글은 존재하지 않습니다.".formatted(id)));
+
+        // ③ 삭제
+        postService.deleteComment(post, postComment);
+
+        return new PostCommentDto(postComment); // 삭제된 댓글 정보를 응답 (상태코드 기본값 200)
+    }
 }

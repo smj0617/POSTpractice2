@@ -25,7 +25,9 @@
 | 4-1 | 댓글 작성 API | ✅ 완료 |
 | 4-2 | 댓글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
-| 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
+| 5-1 | 댓글 삭제 API | ✅ 완료 |
+| 5-2 | 댓글 삭제 MockMvc 성공 테스트 | ⏳ 예정 |
+| 5-3 | 없는 댓글·다른 글의 댓글 삭제 실패 테스트 | ⏳ 예정 |
 
 ## 만들 API
 
@@ -724,3 +726,52 @@ ApiV1PostCommentControllerTest > 댓글 작성 실패 - 내용이 비어 있으�
 
 ![4-3 After - ApiV1PostCommentControllerTest](docs/images/step4-3-after.png)
 ![4-3 After - 전체 20건 통과](docs/images/step4-3-all.png)
+
+---
+
+## 5-1: 댓글 삭제 API
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `Post.java` | `comments` 에 `orphanRemoval = true` / `findCommentById(id)`, `deleteComment(comment)` 추가 |
+| 수정 | `PostService.java` | `@Transactional deleteComment(post, comment)` 추가 |
+| 수정 | `ApiV1PostCommentController.java` | `DELETE /api/v1/posts/{postId}/comments/{id}` → `delete(postId, id)` 추가 |
+
+### 요청과 응답
+
+```http
+DELETE /api/v1/posts/1/comments/2
+```
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{"id":2,"createDate":"...","modifyDate":"...","postId":1,"content":"댓글 1-2"}
+```
+
+| 요청 | 결과 |
+|---|---|
+| 없는 글 `/posts/999/comments/1` | `404` (글 없음) |
+| 없는 댓글 `/posts/1/comments/999` | `404` (댓글 없음) |
+| 다른 글의 댓글 `/posts/2/comments/1` | `404` (2번 글의 댓글 목록에 1번 댓글이 없음) |
+
+### 핵심 포인트
+- **`@PathVariable` 2개**: 주소에 `{postId}` 와 `{id}` 가 모두 있다. 변수 이름이 같은 자리의 값을 받는다.
+- **댓글은 글을 통해서 찾는다**: `post.findCommentById(id)` 는 **그 글의 댓글 목록 안에서만** 찾는다. 그래서 2번 글 주소로 1번 글의 댓글을 지울 수 없다.
+- **댓글은 글을 통해서 지운다**: `post.deleteComment(comment)` 는 `comments.remove(comment)` 만 한다.
+- **`orphanRemoval = true`**: 글의 목록에서 빠진 댓글(고아)을 DB에서도 삭제한다. 트랜잭션이 끝날 때 `delete from post_comment where id=?` 가 실행된다.
+- **`cascade = REMOVE` 와의 차이**: `REMOVE` 는 "글을 지우면 댓글도", `orphanRemoval` 은 "글은 그대로, 목록에서 뺀 댓글만".
+- **`@Transactional` 이 필요한 이유**: `remove()` 는 `delete()` 를 부르지 않는 "객체 수정"이다(4-1 `writeComment` 와 같은 이유).
+
+### 기록: 앱을 실행해서 직접 요청 (`./gradlew bootRun` + `curl`)
+
+1번 글의 **2번 댓글(댓글 1-2)** 을 삭제했다. 같은 요청을 다시 보내거나, 다른 글 주소로 보내면 `404`.
+
+![5-1 curl 실행 결과](docs/images/step5-1-curl.png)
+
+### 테스트 결과
+- 이번 단계에는 새 테스트가 없다. 댓글 삭제 MockMvc 테스트는 **5-2** 에서 만든다.
+- 기존 테스트 20건은 그대로 통과(`BUILD SUCCESSFUL`).

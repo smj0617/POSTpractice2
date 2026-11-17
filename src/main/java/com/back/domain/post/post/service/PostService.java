@@ -57,4 +57,12 @@ public class PostService {
 
         return postComment;
     }
+
+    // [5-1 추가] 댓글 삭제
+    // post.deleteComment() 도 save()/delete() 를 부르지 않는 "객체 수정"이라서 @Transactional 이 필요하다
+    // 트랜잭션이 끝날 때 JPA 가 "목록에서 빠진 댓글"을 알아채고 DELETE 한다 (orphanRemoval)
+    @Transactional
+    public void deleteComment(Post post, PostComment postComment) {
+        post.deleteComment(postComment);
+    }
 }
