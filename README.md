@@ -20,7 +20,7 @@
 | 2-2 | 글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 3-1 | 글 삭제 API | ✅ 완료 |
-| 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ⏳ 예정 |
+| 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ✅ 완료 |
 | 3-3 | 없는 글 삭제 + 실패 테스트 | ⏳ 예정 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
@@ -490,3 +490,50 @@ Content-Type: application/json
 ### 테스트 결과
 - 이번 단계에는 새 테스트가 없다. 삭제 API 테스트는 **3-2** 에서 만든다.
 - 기존 테스트 15건은 그대로 통과(`BUILD SUCCESSFUL`).
+
+---
+
+## 3-2: 글 삭제 성공 테스트 (댓글 있는 글) + `cascade = REMOVE`
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `ApiV1PostControllerTest.java` | 댓글 3개가 달린 1번 글 삭제 테스트 `t4` 추가 |
+| 수정 | `Post.java` | `comments` 의 `cascade = PERSIST` → `cascade = {PERSIST, REMOVE}` |
+
+### 진행 순서: 테스트 먼저 → 실패 확인 → 기능 추가 → 통과
+
+**Before: 테스트를 먼저 작성하고 실행** — `post_comment` 테이블에 1번 글을 가리키는 댓글 3개가 남아 있어서, DB가 글 삭제를 거부했다(외래키 제약 위반).
+
+```
+ApiV1PostControllerTest > 글 삭제 - 댓글이 달린 1번 글을 DELETE 하면 ... FAILED
+    org.springframework.dao.DataIntegrityViolationException at ApiV1PostControllerTest.java:149
+        Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException
+Referential integrity constraint violation: "... POST_COMMENT FOREIGN KEY(POST_ID) REFERENCES PUBLIC.POST(ID) (1)"
+SQL statement: delete from post where id=?
+4 tests completed, 1 failed
+```
+
+![3-2 Before - 실패한 테스트](docs/images/step3-2-before.png)
+![3-2 Before - 실패 상세](docs/images/step3-2-before-detail.png)
+
+**After: `cascade` 에 `REMOVE` 추가** — 글을 지우기 전에 댓글 3개를 먼저 지우고, 마지막에 글을 지운다.
+
+![3-2 After - 실행된 SQL](docs/images/step3-2-sql.png)
+
+### 핵심 포인트
+- **외래키 제약**: `post_comment.post_id` 가 `post.id` 를 가리키고 있으면, 그 글은 DB가 지우지 못하게 막는다. 고아 댓글이 생기는 것을 막기 위한 안전장치다.
+- **`CascadeType.REMOVE`**: 글(부모)을 `delete` 하면 `comments`(자식)에도 `delete` 를 전파한다. JPA가 댓글 목록을 먼저 불러온 뒤 `delete from post_comment` → `delete from post` 순서로 실행한다.
+- **에러가 149번 줄(`count()`)에서 난 이유**: 테스트 전체가 `@Transactional` 이라 `delete()` 가 테스트 트랜잭션에 합류했다. JPA는 DELETE 를 바로 보내지 않고 모아 두었다가, 다음 조회(`count()`) 직전에 DB로 보낸다(flush). 그 순간 DB가 거부한 것이다.
+- **`findById(1)` → `isEmpty()`**: 글이 정말로 DB에서 사라졌는지 확인한다. `findById` 가 `Optional` 을 돌려주므로 비어 있으면 없는 글이다.
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostControllerTest.t4` | `DELETE /api/v1/posts/1` → `200`, 응답 `id=1`·`제목 1`·`내용 1`, 글 개수 3 → 2, `findById(1)` 비어 있음 | ✅ 통과 |
+| 기존 테스트 15건 | | ✅ 통과 |
+
+![3-2 After - ApiV1PostControllerTest](docs/images/step3-2-after.png)
+![3-2 After - 전체 16건 통과](docs/images/step3-2-all.png)

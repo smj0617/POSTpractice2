@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static jakarta.persistence.CascadeType.PERSIST;
+import static jakarta.persistence.CascadeType.REMOVE; // [3-2 추가]
 import static lombok.AccessLevel.PROTECTED;
 
 // @Entity 가 붙으면 이 클래스를 보고 DB에 post 테이블이 만들어진다
@@ -30,7 +31,9 @@ public class Post extends BaseEntity {
     //                     → post 테이블에는 칼럼이 생기지 않는다
     // [1-6 추가] cascade = PERSIST : 글을 저장(영속화)할 때, comments 에 새로 추가된 댓글도 같이 저장한다
     //                               → 댓글마다 save() 를 부르지 않아도 INSERT 된다
-    @OneToMany(mappedBy = "post", cascade = PERSIST)
+    // [3-2 수정] cascade 에 REMOVE 추가 : 글을 삭제할 때, 달린 댓글들도 먼저 같이 삭제한다
+    //                                    → 댓글이 남아 있어서 생기는 외래키 에러가 사라진다
+    @OneToMany(mappedBy = "post", cascade = {PERSIST, REMOVE})
     private List<PostComment> comments = new ArrayList<>();
 
     // 글을 만들 때는 이 생성자를 쓴다 (id, 날짜는 저장할 때 자동으로 채워짐)

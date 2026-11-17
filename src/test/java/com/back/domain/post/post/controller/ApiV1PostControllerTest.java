@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete; // [3-2 추가]
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -119,5 +120,33 @@ public class ApiV1PostControllerTest {
                 .andExpect(status().isBadRequest());
 
         assertThat(postService.count()).isEqualTo(countBefore);
+    }
+
+    // ---------- [3-2 추가] 글 삭제 ----------
+
+    @Test
+    @DisplayName("글 삭제 - 댓글이 달린 1번 글을 DELETE 하면 200 과 삭제된 글이 응답되고, DB에서 사라진다")
+    void t4() throws Exception {
+        long countBefore = postService.count(); // 3
+
+        // ① 요청 보내기: 1번 글(댓글 3개 달림) 삭제
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/1")
+                )
+                .andDo(print());
+
+        // ② 응답 검사
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isOk())                   // 200
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.title").value("제목 1"))
+                .andExpect(jsonPath("$.content").value("내용 1"));
+
+        // ③ DB 검사: 글 개수가 1 줄었고, 1번 글은 더 이상 찾을 수 없다
+        assertThat(postService.count()).isEqualTo(countBefore - 1);
+        assertThat(postService.findById(1)).isEmpty();
     }
 }
