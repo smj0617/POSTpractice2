@@ -12,7 +12,7 @@
 |---|---|---|
 | 1-1 | 빈 Spring Boot 프로젝트 + 앱 실행 테스트 | ✅ 완료 |
 | 1-2 | JPA·H2 설정 + `BaseEntity` + `Post` 엔티티 | ✅ 완료 |
-| 1-3 | `PostRepository` + `PostService` + 테스트 | ⏳ 예정 |
+| 1-3 | `PostRepository` + `PostService` + 테스트 | ✅ 완료 |
 | 1-4 | 샘플 글 3건 자동 생성 + 테스트 | ⏳ 예정 |
 | 1-5 | `PostComment` 엔티티 + `post.addComment()` | ⏳ 예정 |
 | 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ⏳ 예정 |
@@ -99,3 +99,45 @@ create table post (
 | `PostTest.t2` | DB에 저장하기 전에는 `id`, `createDate` 가 `null` 이다 | ✅ 통과 |
 
 ![1-2 테스트 결과](docs/images/step1-2-test.png)
+
+---
+
+## 1-3: `PostRepository` + `PostService` + 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `domain/post/post/repository/PostRepository.java` | DB 접근 담당. `JpaRepository` 상속만으로 `save`, `count` 등 사용 |
+| 추가 | `domain/post/post/service/PostService.java` | `write(제목, 내용)`, `count()` |
+| 추가 | `test/resources/application-test.yaml` | 테스트 전용 설정: 메모리 DB(`db_test`), `create-drop` |
+| 수정 | `BackApplicationTests.java` | `@ActiveProfiles("test")` 1줄 추가 |
+| 추가 | `test/.../service/PostServiceTest.java` | 글 저장·개수 테스트 |
+
+### 핵심 포인트
+- **역할 분리**: Controller(2단계) → **Service**(기능 단위 로직) → **Repository**(DB 접근)
+- **의존성 주입**: `PostService` 는 `PostRepository` 를 직접 `new` 하지 않는다. `@RequiredArgsConstructor` 가 만든 생성자로 스프링이 넣어 준다.
+- **테스트 DB 분리**: `@ActiveProfiles("test")` 가 붙은 테스트는 메모리 DB를 쓴다. 개발용 `db_dev` 파일은 그대로다.
+- **`@Transactional` 테스트**: 테스트가 끝나면 저장한 글이 롤백된다. 그래서 `t3` 에서 2개를 저장해도 다른 테스트의 `count()` 에 영향이 없다.
+
+### 기록: `write()`, `count()` 가 실행한 SQL (테스트 로그에서 발췌)
+
+```sql
+-- postService.write("제목", "내용") → postRepository.save(post)
+insert into post (content, create_date, modify_date, title, id)
+values (?, ?, ?, ?, default)
+
+-- postService.count() → postRepository.count()
+select count(*) from post p1_0
+```
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `PostServiceTest.t1` | 처음에는 글이 0개다 | ✅ 통과 |
+| `PostServiceTest.t2` | `write()` 로 저장하면 `id`, `createDate` 가 채워진다 (1-2 의 `PostTest.t2` 와 비교) | ✅ 통과 |
+| `PostServiceTest.t3` | `write()` 를 2번 하면 `count()` 가 2 | ✅ 통과 |
+| 기존 테스트 3건 | `contextLoads`, `PostTest.t1`, `PostTest.t2` | ✅ 통과 |
+
+![1-3 테스트 결과](docs/images/step1-3-test.png)
