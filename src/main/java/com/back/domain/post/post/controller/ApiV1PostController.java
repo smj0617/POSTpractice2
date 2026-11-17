@@ -8,8 +8,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException; // [3-3 추가]
 
 import static org.springframework.http.HttpStatus.CREATED;
+import static org.springframework.http.HttpStatus.NOT_FOUND; // [3-3 추가]
 
 // HTTP 요청을 받는 입구
 // 요청 → Controller → Service → Repository → DB
@@ -54,7 +56,12 @@ public class ApiV1PostController {
     public PostDto delete(
             @PathVariable long id // 주소의 {id} 부분을 꺼내서 id 변수에 넣는다
     ) {
-        Post post = postService.findById(id).get(); // 삭제할 글을 먼저 찾는다
+        // 삭제할 글을 먼저 찾는다
+        // [3-3 수정] .get() → .orElseThrow(...)
+        //   글이 없으면(빈 Optional) ResponseStatusException 을 던진다
+        //   → 스프링이 이 예외를 보고 404 Not Found 로 응답한다 (메서드의 나머지 줄은 실행되지 않음)
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "%d번 글은 존재하지 않습니다.".formatted(id)));
 
         postService.delete(post);
 

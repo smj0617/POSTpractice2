@@ -149,4 +149,25 @@ public class ApiV1PostControllerTest {
         assertThat(postService.count()).isEqualTo(countBefore - 1);
         assertThat(postService.findById(1)).isEmpty();
     }
+
+    // ---------- [3-3 추가] 글 삭제 실패 ----------
+
+    @Test
+    @DisplayName("글 삭제 실패 - 없는 글(999번)을 DELETE 하면 404 이고, 글 개수는 그대로다")
+    void t5() throws Exception {
+        long countBefore = postService.count(); // 3
+
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/api/v1/posts/999")
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(handler().handlerType(ApiV1PostController.class))
+                .andExpect(handler().methodName("delete"))
+                .andExpect(status().isNotFound()); // 404 : 그런 글은 없다
+
+        assertThat(postService.count()).isEqualTo(countBefore); // 아무것도 지워지지 않았다
+    }
 }

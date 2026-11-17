@@ -21,7 +21,7 @@
 | 2-3 | 글 작성 입력값 검증 + 실패 테스트 | ✅ 완료 |
 | 3-1 | 글 삭제 API | ✅ 완료 |
 | 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ✅ 완료 |
-| 3-3 | 없는 글 삭제 + 실패 테스트 | ⏳ 예정 |
+| 3-3 | 없는 글 삭제 + 실패 테스트 | ✅ 완료 |
 | 4-1 ~ 4-3 | 댓글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
 
@@ -537,3 +537,60 @@ SQL statement: delete from post where id=?
 
 ![3-2 After - ApiV1PostControllerTest](docs/images/step3-2-after.png)
 ![3-2 After - 전체 16건 통과](docs/images/step3-2-all.png)
+
+---
+
+## 3-3: 없는 글 삭제 → 404 + 실패 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 수정 | `ApiV1PostControllerTest.java` | 없는 글(999번) 삭제 실패 테스트 `t5` 추가 |
+| 수정 | `ApiV1PostController.java` | `findById(id).get()` → `findById(id).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, ...))` |
+
+### 요청과 응답
+
+```http
+DELETE /api/v1/posts/999
+```
+
+```http
+HTTP/1.1 404
+(Error message: 999번 글은 존재하지 않습니다.)
+```
+
+### 진행 순서: 테스트 먼저 → 실패 확인 → 기능 추가 → 통과
+
+**Before: 테스트를 먼저 작성하고 실행** — 빈 `Optional` 에 `.get()` 을 해서 `NoSuchElementException` 이 터졌다. 아무도 처리하지 않는 예외라서 404 가 아니라 서버 에러(500)가 된다.
+
+```
+ApiV1PostControllerTest > 글 삭제 실패 - 없는 글(999번)을 DELETE 하면 404 이고, 글 개수는 그대로다 FAILED
+    jakarta.servlet.ServletException at ApiV1PostControllerTest.java:161
+        Caused by: java.util.NoSuchElementException: No value present
+5 tests completed, 1 failed
+```
+
+![3-3 Before - 실패한 테스트](docs/images/step3-3-before.png)
+![3-3 Before - 실패 상세](docs/images/step3-3-before-detail.png)
+
+**After: `.orElseThrow(...)` 로 404 응답** — 글이 없으면 `ResponseStatusException(NOT_FOUND)` 을 던지고, 스프링이 이것을 `404` 응답으로 바꾼다. `delete` SQL 은 실행되지 않는다.
+
+![3-3 After - print 출력](docs/images/step3-3-print.png)
+
+### 핵심 포인트
+- **`Optional.get()`**: 값이 없으면 `NoSuchElementException` 을 던진다. "없을 수도 있다"는 경우를 무시하는 코드라서 위험하다.
+- **`Optional.orElseThrow(() -> 예외)`**: 값이 있으면 꺼내고, 없으면 내가 고른 예외를 던진다.
+- **`ResponseStatusException`**: 스프링이 알아보는 예외. 던질 때 정한 상태코드(`NOT_FOUND` = 404)와 메시지로 응답한다. 예외가 던져진 줄에서 메서드가 멈추므로 아래의 `delete()` 는 실행되지 않는다.
+- **상태코드 의미**: `500` = 서버 잘못(버그), `404` = 요청한 대상이 없음(클라이언트가 확인할 문제). 없는 글 삭제는 404 가 맞다.
+- 지금은 응답 본문이 비어 있다. 에러 내용을 JSON 으로 돌려주는 것은 이번 실습 범위 밖이다.
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostControllerTest.t5` | `DELETE /api/v1/posts/999` → `404`, 글 개수 그대로 | ✅ 통과 |
+| 기존 테스트 16건 | | ✅ 통과 |
+
+![3-3 After - ApiV1PostControllerTest](docs/images/step3-3-after.png)
+![3-3 After - 전체 17건 통과](docs/images/step3-3-all.png)
