@@ -5,6 +5,8 @@ import com.back.domain.post.post.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 // 비즈니스 로직 담당 ("글을 쓴다", "글이 몇 개인지 센다" 같은 기능 단위)
 // 컨트롤러(2단계에서 추가)는 서비스를 부르고, 서비스는 리포지터리를 부른다
 @Service // 스프링이 이 클래스의 객체를 1개 만들어 관리한다(빈 등록)
@@ -21,5 +23,10 @@ public class PostService {
     public Post write(String title, String content) {
         Post post = new Post(title, content); // 이 시점에는 id 가 null
         return postRepository.save(post);     // INSERT 실행 → id 가 채워진 Post 가 돌아온다
+    }
+
+    // [1-4 추가] 전체 글 목록
+    public List<Post> findAll() {
+        return postRepository.findAll(); // SELECT * FROM post
     }
 }

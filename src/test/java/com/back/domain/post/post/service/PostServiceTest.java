@@ -18,9 +18,9 @@ public class PostServiceTest {
     private PostService postService;
 
     @Test
-    @DisplayName("처음에는 글이 0개다")
+    @DisplayName("처음에는 샘플 글 3개가 있다") // [1-4 수정] 0개 → 3개 (BaseInitData 가 샘플 글 3건을 만들기 때문)
     void t1() {
-        assertThat(postService.count()).isEqualTo(0);
+        assertThat(postService.count()).isEqualTo(3);
     }
 
     @Test
@@ -36,11 +36,13 @@ public class PostServiceTest {
     }
 
     @Test
-    @DisplayName("write() 를 2번 하면 글 개수가 2개가 된다")
+    @DisplayName("write() 를 2번 하면 글 개수가 2개 늘어난다") // [1-4 수정] "2개가 된다" → "2개 늘어난다"
     void t3() {
+        long before = postService.count(); // 샘플 데이터가 몇 개든 상관없도록, 저장 전 개수를 먼저 잰다
+
         postService.write("제목 1", "내용 1");
         postService.write("제목 2", "내용 2");
 
-        assertThat(postService.count()).isEqualTo(2);
+        assertThat(postService.count()).isEqualTo(before + 2);
     }
 }

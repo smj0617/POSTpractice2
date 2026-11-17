@@ -13,7 +13,7 @@
 | 1-1 | 빈 Spring Boot 프로젝트 + 앱 실행 테스트 | ✅ 완료 |
 | 1-2 | JPA·H2 설정 + `BaseEntity` + `Post` 엔티티 | ✅ 완료 |
 | 1-3 | `PostRepository` + `PostService` + 테스트 | ✅ 완료 |
-| 1-4 | 샘플 글 3건 자동 생성 + 테스트 | ⏳ 예정 |
+| 1-4 | 샘플 글 3건 자동 생성 + 테스트 | ✅ 완료 |
 | 1-5 | `PostComment` 엔티티 + `post.addComment()` | ⏳ 예정 |
 | 1-6 | 샘플 댓글 5건 자동 생성 + 테스트 | ⏳ 예정 |
 | 2-1 ~ 2-3 | 글 작성 API → 성공 테스트 → 입력값 검증·실패 테스트 | ⏳ 예정 |
@@ -141,3 +141,55 @@ select count(*) from post p1_0
 | 기존 테스트 3건 | `contextLoads`, `PostTest.t1`, `PostTest.t2` | ✅ 통과 |
 
 ![1-3 테스트 결과](docs/images/step1-3-test.png)
+
+---
+
+## 1-4: 샘플 글 3건 자동 생성 + 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `global/initData/BaseInitData.java` | 앱 시작 시 글이 0개면 `제목 1`, `제목 2`, `제목 3` 생성 |
+| 수정 | `PostService.java` | `findAll()` 추가 (전체 글 목록) |
+| 추가 | `test/.../initData/BaseInitDataTest.java` | 샘플 글 3건 확인 테스트 |
+| 수정 | `PostServiceTest.java` | 샘플 글 때문에 깨진 테스트 2개 수정 |
+
+### 핵심 포인트
+- **`ApplicationRunner`**: 앱 시작이 끝나면 자동으로 1번 실행된다. 여기서 샘플 글을 만든다.
+- **`if (count() > 0) return;`**: 이미 글이 있으면 만들지 않는다. 그래서 앱을 여러 번 재시작해도 샘플 글이 계속 쌓이지 않는다.
+- **테스트도 영향을 받는다**: 테스트도 스프링을 띄우므로 `BaseInitData` 가 실행된다. 즉 모든 테스트는 "글 3개가 있는 상태"에서 시작한다.
+
+### Before: 샘플 글을 추가했더니 기존 테스트 2개가 실패
+
+1-3 에서 만든 `PostServiceTest` 는 "처음에는 글이 0개"라고 가정했다. 샘플 글 3건이 생기면서 이 가정이 깨졌다.
+
+```
+PostServiceTest > 처음에는 글이 0개다 FAILED
+    expected: 0L
+     but was: 3L
+PostServiceTest > write() 를 2번 하면 글 개수가 2개가 된다 FAILED
+8 tests completed, 2 failed
+```
+
+![1-4 Before - 실패한 테스트](docs/images/step1-4-before.png)
+![1-4 Before - 실패 상세](docs/images/step1-4-before-detail.png)
+
+### After: 테스트 수정
+
+| 테스트 | Before | After |
+|---|---|---|
+| `t1` | `count()` 가 `0` | `count()` 가 `3` |
+| `t3` | `count()` 가 `2` | 저장 전 개수(`before`)를 먼저 재고, `before + 2` 인지 확인 → 샘플 데이터 개수가 바뀌어도 깨지지 않음 |
+
+![1-4 After - PostServiceTest 통과](docs/images/step1-4-after.png)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `BaseInitDataTest.t1` | 앱이 시작되면 샘플 글 3건이 있다 | ✅ 통과 |
+| `BaseInitDataTest.t2` | 제목이 `제목 1`, `제목 2`, `제목 3` 이고 id 가 1, 2, 3 이다 | ✅ 통과 |
+| 기존 테스트 6건 | `PostServiceTest` 2건 수정 후 전부 | ✅ 통과 |
+
+![1-4 테스트 결과](docs/images/step1-4-test.png)
