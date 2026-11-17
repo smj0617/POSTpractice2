@@ -23,7 +23,7 @@
 | 3-2 | 글 삭제 성공 테스트 (댓글 있는 글 포함) | ✅ 완료 |
 | 3-3 | 없는 글 삭제 + 실패 테스트 | ✅ 완료 |
 | 4-1 | 댓글 작성 API | ✅ 완료 |
-| 4-2 | 댓글 작성 MockMvc 성공 테스트 | ⏳ 예정 |
+| 4-2 | 댓글 작성 MockMvc 성공 테스트 | ✅ 완료 |
 | 4-3 | 댓글 작성 입력값 검증 + 실패 테스트 | ⏳ 예정 |
 | 5-1 ~ 5-3 | 댓글 삭제 API → 성공 테스트 → 없는 댓글 삭제·실패 테스트 | ⏳ 예정 |
 
@@ -644,3 +644,39 @@ Content-Type: application/json
 ### 테스트 결과
 - 이번 단계에는 새 테스트가 없다. 댓글 작성 MockMvc 테스트는 **4-2** 에서 만든다.
 - 기존 테스트 17건은 그대로 통과(`BUILD SUCCESSFUL`).
+
+---
+
+## 4-2: 댓글 작성 MockMvc 성공 테스트
+
+### 바뀐 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 추가 | `test/.../postComment/controller/ApiV1PostCommentControllerTest.java` | 댓글 작성 성공 테스트 `t1` |
+
+### 테스트 흐름 (2-2 글 작성 테스트와 같은 구성)
+1. **요청**: `POST /api/v1/posts/1/comments` + `{"content": "새 댓글"}` (4-1 의 curl 과 같은 요청)
+2. **DB에서 꺼내기**: `postService.findById(1).get().getComments().getLast()` → 방금 작성한 댓글
+3. **응답 검사**: 처리한 컨트롤러·메서드, `201`, JSON 의 `id`, `createDate`, `modifyDate`, `postId`, `content`
+4. **DB 검사**: 1번 글의 댓글 3개 → 4개, 새 댓글 `id` 는 6, 내용 `새 댓글`, 연결된 글이 1번 글
+
+### 핵심 포인트
+- **댓글 리포지터리 없이 댓글을 꺼내는 방법**: 글을 찾은 뒤 `post.getComments()`. 댓글은 글을 통해 만들고, 글을 통해 꺼낸다.
+- **`getLast()`**: 리스트의 마지막 요소 (Java 21+). 방금 추가한 댓글이 목록의 맨 뒤에 있다.
+- **`isSameAs(post)`**: 값이 같은지가 아니라 **같은 객체인지** 확인한다. 한 트랜잭션 안에서는 같은 글을 몇 번 꺼내도 JPA가 같은 객체를 돌려준다.
+- **SQL 순서**: `select post` → `insert post_comment`(`flush`) → 응답 → `select post_comment`. 마지막 조회는 `comments` 가 `LAZY` 라서 테스트가 `getComments()` 를 실제로 쓸 때 실행된다.
+
+### 기록: `andDo(print())` 출력 + SQL
+
+![4-2 print 출력](docs/images/step4-2-print.png)
+
+### 테스트 결과
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `ApiV1PostCommentControllerTest.t1` | `POST /api/v1/posts/1/comments` → `201`, 응답 필드 5개, 댓글 3 → 4개, `id=6` | ✅ 통과 |
+| 기존 테스트 17건 | | ✅ 통과 |
+
+![4-2 ApiV1PostCommentControllerTest](docs/images/step4-2-test.png)
+![4-2 전체 18건 통과](docs/images/step4-2-all.png)
